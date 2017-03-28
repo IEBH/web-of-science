@@ -41,6 +41,7 @@ function webOfScience(options) {
 				'</soapenv:Envelope>'
 			)
 			.end(function(err, res) {
+				if (err) return cb(err);
 				res.body = xmlParser.xml2js(res.text, {compact: true});
 
 				var authPath = ['soap:Envelope', 'soap:Body', 'ns2:authenticateResponse', 'return', '_text'];
@@ -52,6 +53,101 @@ function webOfScience(options) {
 				}
 			});
 	};
+
+
+	/**
+	* Return the cited references of a resource
+	* NOTE: to compute the wID use doiToWosID to convert from the more universal DOI
+	*
+	* The return value of this function is an object containing some meta information + the results array
+	*     {meta: {found: Number, searched: Number}, results: Array}
+	*
+	* Each result is an object containing at least a `wosID` field and any of the following optional fields: `author`, `count`, `volume`, `pages`, `year`, `work`, `hot`
+	*
+	* @param {string} wosID The WoS resource ID to query
+	* @param {object} [options] Optional additional options to pass when querying
+	* @param {function} cb The callback, returns (err, results)
+	*/
+	wos.cited = argy('string [object] function', function(wosID, options, cb) {
+		async()
+			.then(next => wos.login(next))
+			.then('refs', function(next) {
+				superagent.post('http://search.webofknowledge.com/esti/wokmws/ws/WokSearch')
+					.send(
+						'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:woksearch="http://woksearch.v3.wokmws.thomsonreuters.com">' +
+							'<soapenv:Header/>' +
+							'<soapenv:Body>' +
+								'<woksearch:citedReferences>' +
+									'<databaseId>WOS</databaseId> ' +
+									'<uid>' + wosID + '</uid>' +
+									'<queryLanguage>en</queryLanguage>' +
+									'<retrieveParameters>' +
+										'<firstRecord>1</firstRecord>' +
+										'<count>100</count>' +
+										'<option>' +
+											'<key>Hot</key>' +
+											'<value>On</value>' +
+										'</option>' +
+									'</retrieveParameters>' +
+								'</woksearch:citedReferences>' +
+							'</soapenv:Body>' +
+						'</soapenv:Envelope>'
+					)
+					.end(function(err, res) {
+						if (err) return cb(err);
+						res.body = xmlParser.xml2js(res.text, {compact: true});
+
+						var refsPath = ['soap:Envelope', 'soap:Body', 'ns2:citedReferencesResponse', 'return'];
+						if (_.has(res.body, refsPath)) {
+							var raw = _.get(res.body, refsPath);
+							next(null, {
+								meta: {
+									found: parseInt(raw.recordsFound._text),
+									searched: parseInt(raw.recordsSearched._text),
+								},
+								results: raw.references.map(r => {
+									var ref = {
+										wosID: r.docid._text,
+									};
+
+									[
+										{wosField: 'citedAuthor', ourField: 'author', type: 'string'},
+										{wosField: 'timesCited', ourField: 'count', type: 'number'},
+										{wosField: 'volume', ourField: 'volume', type: 'string'},
+										{wosField: 'pages', ourField: 'pages', type: 'string'},
+										{wosField: 'year', ourField: 'year', type: 'number'},
+										{wosField: 'citedWork', ourField: 'work', type: 'string'},
+										{wosField: 'hot', ourField: 'hot', type: 'boolean'},
+									].forEach(f => { // Glue optional fields
+										if (r[f.wosField]) {
+											switch (f.type) {
+												case 'string':
+													ref[f.ourField] = r[f.wosField]._text;
+													break;
+												case 'number':
+													ref[f.ourField] = parseInt(r[f.wosField]._text);
+													break;
+												case 'boolean':
+													ref[f.ourField] = r[f.wosField]._text == 'yes';
+													break;
+												default: throw new Error('Unknown conversion type: ' + f.type);
+											}
+										}
+									})
+
+									return ref;
+								})
+							});
+						} else {
+							next('No results returned');
+						}
+					});
+			})
+			.end(function(err) {
+				if (err) return cb(err);
+				cb(null, this.refs);
+			});
+	});
 
 	return wos;
 }

@@ -56,7 +56,7 @@ function webOfScience(options) {
 
 
 	/**
-	* Return the cited references of a resource
+	* Return the cited references of a resource (i.e. the papers THIS paper has as citations)
 	* NOTE: to compute the wID use doiToWosID to convert from the more universal DOI
 	*
 	* The return value of this function is an object containing some meta information + the results array
@@ -135,6 +135,89 @@ function webOfScience(options) {
 										}
 									})
 
+									return ref;
+								})
+							});
+						} else {
+							next('No results returned');
+						}
+					});
+			})
+			.end(function(err) {
+				if (err) return cb(err);
+				cb(null, this.refs);
+			});
+	});
+
+
+	/**
+	* Return the citing references of a resource (i.e. papers that have THIS paper as a citation)
+	* This function is the reverse loookup of wos.cited()
+	* NOTE: While at first glance this function and wos.cited() appear to be similar they work entirely differently and return different data
+	*
+	* The return value of this function is an object containing some meta information + the results array
+	*     {meta: {found: Number, searched: Number}, results: Array}
+	*
+	* Each result has the keys `wosID`, `title`, `authors` and `publisher`
+	*
+	* @param {string} wosID The WoS resource ID to query
+	* @param {object} [options] Optional additional options to pass when querying
+	* @param {function} cb The callback, returns (err, results)
+	*/
+	wos.citing = argy('string [object] function', function(wosID, options, cb) {
+		async()
+			.then(next => wos.login(next))
+			.then('refs', function(next) {
+				superagent.post('http://search.webofknowledge.com/esti/wokmws/ws/WokSearch')
+					.send(
+						'<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:woksearch="http://woksearch.v3.wokmws.thomsonreuters.com">' +
+							'<soapenv:Header/>' +
+							'<soapenv:Body>' +
+								'<woksearch:citingArticles>' +
+									'<databaseId>WOS</databaseId> ' +
+									'<uid>' + wosID + '</uid>' +
+									'<queryLanguage>en</queryLanguage>' +
+									'<retrieveParameters>' +
+										'<firstRecord>1</firstRecord>' +
+										'<count>100</count>' +
+										'<option>' +
+											'<key>RecordIDs</key>' +
+											'<value>On</value>' +
+										'</option>' +
+									'</retrieveParameters>' +
+								'</woksearch:citingArticles>' +
+							'</soapenv:Body>' +
+						'</soapenv:Envelope>'
+					)
+					.end(function(err, res) {
+						if (err) return cb(err);
+						res.body = xmlParser.xml2js(res.text, {compact: true});
+
+						var refsPath = ['soap:Envelope', 'soap:Body', 'ns2:citingArticlesResponse', 'return'];
+						if (_.has(res.body, refsPath)) {
+							var raw = _.get(res.body, refsPath);
+
+							// For reasons of utter insanity WoS returns its result set as an encoded text BLOB which needs to be broken back into XML
+							// I can only assume the people who thought this was a good idea have now been thoroughly beaten with their own shoes - MC 2017-04-11
+							raw.references = xmlParser.xml2js(raw.records._text, {compact: true}).records.REC;
+
+							next(null, {
+								meta: {
+									found: parseInt(raw.recordsFound._text),
+									searched: parseInt(raw.recordsSearched._text),
+								},
+								results: raw.references.map(r => {
+									try {
+										var ref = {
+											wosID: r.UID._text,
+											title: r.static_data.summary.titles.title.filter(t => t._attributes.type == 'item')[0]._text,
+											authors: _.get(r, 'static_data.summary.names.name.full_name._text') || r.static_data.summary.names.name.map(n => n.full_name._text),
+											publisher: r.static_data.summary.publishers.publisher.names.name.full_name._text,
+										};
+									} catch (e) {
+										console.log('FAIL - ', e, 'FOR', r);
+										debugger;
+									}
 									return ref;
 								})
 							});

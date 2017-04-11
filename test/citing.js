@@ -2,7 +2,7 @@ var expect = require('chai').expect;
 var mlog = require('mocha-logger');
 var webOfScience = require('..');
 
-describe('wos.citing()', function() {
+describe('citing()', function() {
 
 	var wos;
 	before(()=> wos = new webOfScience(require('./config')));

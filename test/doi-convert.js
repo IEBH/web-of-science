@@ -2,7 +2,7 @@ var expect = require('chai').expect;
 var mlog = require('mocha-logger');
 var webOfScience = require('..');
 
-describe.skip('wos.doiToWosID()', function() {
+describe('doiToWosID()', function() {
 
 	var wos;
 	before(()=> wos = new webOfScience(require('./config')));
@@ -20,7 +20,7 @@ describe.skip('wos.doiToWosID()', function() {
 
 });
 
-describe('wos.wosIDToDoi', function() {
+describe('wosIDToDoi()', function() {
 
 	var wos;
 	before(()=> wos = new webOfScience(require('./config')));

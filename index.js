@@ -138,7 +138,9 @@ function webOfScience(options) {
 				var dataPath = ['response', 'fn', 'map', 'map', 'map', 'val'];
 				if (!_.has(res.body, dataPath)) return cb('No wosID found');
 
-				cb(null, _.get(res.body, dataPath).filter(i => i._attributes.name == 'doi')[0]._text);
+				var data = _.get(res.body, dataPath);
+				if (data._text) return cb(data._text);
+				cb(null, data.filter(i => i._attributes.name == 'doi')[0]._text);
 			});
 	});
 

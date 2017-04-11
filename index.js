@@ -56,6 +56,94 @@ function webOfScience(options) {
 
 
 	/**
+	* Convert a DOI into a Web of Science ID
+	* WOS ID's are prefixed with an optional 'WOS:'
+	* @param {string} doi The DOI to convert
+	* @param {Object} options Optional options to use
+	* @param {funtion} cb The callback fired with (err, wosID)
+	*/
+	wos.doiToWosID = argy('string [object] function', function(doi, options, cb) {
+		superagent.post('https://ws.isiknowledge.com/cps/xrpc')
+			.send(
+				'<?xml version="1.0" encoding="UTF-8" ?>' +
+				'<request xmlns="http://www.isinet.com/xrpc42" src="app.id=API Demo">' +
+					'<fn name="LinksAMR.retrieve">' +
+						'<list>' +
+							'<map>   ' +
+								'<val name="username">' + wos.settings.user + '</val>' +
+								'<val name="password">' + wos.settings.pass + '</val>' +
+							'</map>' +
+							'<map>' +
+								'<list name="WOS">' +
+									'<val>doi</val>' +
+									'<val>ut</val>' +
+								'</list>' +
+							'</map>' +
+							'<map>' +
+								'<map name="cite_1">' +
+									'<val name="doi">' + doi + '</val>' +
+								'</map>' +
+							'</map>' +
+						'</list>' +
+					'</fn>' +
+				'</request>'
+			)
+			.end(function(err, res) {
+				if (err) return cb(err);
+				res.body = xmlParser.xml2js(res.text, {compact: true});
+				var dataPath = ['response', 'fn', 'map', 'map', 'map', 'val'];
+				if (!_.has(res.body, dataPath)) return cb('No wosID found');
+
+				cb(null, 'WOS:' + _.get(res.body, dataPath).filter(i => i._attributes.name == 'ut')[0]._text);
+			});
+	});
+
+
+	/**
+	* Convert a Web of Science ID into a DOI
+	* WOS ID's are prefixed with an optional 'WOS:'
+	* @param {string} wosID The wosID to convert
+	* @param {Object} options Optional options to use
+	* @param {funtion} cb The callback fired with (err, doi)
+	*/
+	wos.wosIDToDoi = argy('string [object] function', function(wosID, options, cb) {
+		superagent.post('https://ws.isiknowledge.com/cps/xrpc')
+			.send(
+				'<?xml version="1.0" encoding="UTF-8" ?>' +
+				'<request xmlns="http://www.isinet.com/xrpc42" src="app.id=API Demo">' +
+					'<fn name="LinksAMR.retrieve">' +
+						'<list>' +
+							'<map>   ' +
+								'<val name="username">' + wos.settings.user + '</val>' +
+								'<val name="password">' + wos.settings.pass + '</val>' +
+							'</map>' +
+							'<map>' +
+								'<list name="WOS">' +
+									'<val>doi</val>' +
+									'<val>ut</val>' +
+								'</list>' +
+							'</map>' +
+							'<map>' +
+								'<map name="cite_1">' +
+									'<val name="ut">' + wosID + '</val>' +
+								'</map>' +
+							'</map>' +
+						'</list>' +
+					'</fn>' +
+				'</request>'
+			)
+			.end(function(err, res) {
+				if (err) return cb(err);
+				res.body = xmlParser.xml2js(res.text, {compact: true});
+				var dataPath = ['response', 'fn', 'map', 'map', 'map', 'val'];
+				if (!_.has(res.body, dataPath)) return cb('No wosID found');
+
+				cb(null, _.get(res.body, dataPath).filter(i => i._attributes.name == 'doi')[0]._text);
+			});
+	});
+
+
+	/**
 	* Return the cited references of a resource (i.e. the papers THIS paper has as citations)
 	* NOTE: to compute the wID use doiToWosID to convert from the more universal DOI
 	*

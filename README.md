@@ -17,6 +17,18 @@ wos.login(function(err, sessionToken) {
 });
 
 
+// Convert a DOI -> WebOfScienceID
+wos.doiToWosID('10.3322/caac.20107', function(err, doi) {
+	// ...
+});
+
+
+// Convert a WebOfScienceID -> DOI
+wos.wosIDToDoi('WOS:000270372400005', function(err, wosID) {
+	// ...
+});
+
+
 // Get papers that WOS:000270372400005 cites
 wos.cites('WOS:000270372400005', function(err, res) {
 	// res = res.meta + res.results

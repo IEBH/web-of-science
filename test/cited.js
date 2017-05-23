@@ -10,7 +10,7 @@ describe('cited()', function() {
 	it('should get a list of papers cited (using docs example paper wosID)', function(done) {
 		this.timeout(10 * 1000);
 
-		wos.cited('WOS:000270372400005', function(err, res) {
+		wos.cited('WOS:000288278400004', function(err, res) {
 			expect(err).to.not.be.ok;
 
 			expect(res).to.have.property('meta');

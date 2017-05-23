@@ -50,3 +50,31 @@ describe('wosIDToDoi()', function() {
 	});
 
 });
+
+
+describe.only('wosRefToDoi()', function() {
+	var wos;
+	before(()=> wos = new webOfScience(require('./config')));
+	before('should login', done => wos.login(done));
+
+	it('should convert a title into a DOI', function(done) {
+		this.timeout(5 * 1000);
+
+		wos.wosRefToDoi({
+			wosID: 'WOS:74861129',
+			title: 'The decrease in breast-cancer incidence in 2003 in the United States.',
+			author: 'Ravdin, Peter M.',
+			count: 569,
+			volume: '356',
+			year: 2007,
+			work: 'NEW ENGLAND JOURNAL OF MEDICINE',
+			hot: true,
+		}, function(err, wosID) {
+			expect(err).to.not.be.ok;
+			expect(wosID).to.be.a.string;
+			expect(wosID).to.be.equal('10.3322/caac.20107');
+			done();
+		});
+	});
+
+});
